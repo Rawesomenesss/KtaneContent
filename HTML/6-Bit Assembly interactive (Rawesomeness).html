@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1">
+    <title>6-Bit Assembly — Keep Talking and Nobody Explodes Module</title>
+    <link rel="stylesheet" type="text/css" href="css/font.css">
+    <link rel="stylesheet" type="text/css" href="css/normalize.css">
+    <link rel="stylesheet" type="text/css" href="css/main.css">
+    <script src="js/ktane-utils.js" defer></script>
+    <script src="js/Modules/6-Bit Assembly Interactive.js" defer></script>
+    <!-- Remove the whole style tag if empty -->
+    <style>
+        /* Remove this if you do not have any tables */
+        table {
+          border-collapse: collapse;
+          border-spacing: 0;
+        }
+
+        th, td {
+          padding: 0;
+          border: none;
+          text-align: center;      /* Horizontally center text/content */
+          vertical-align: middle;
+          font-size: 12px;
+        }
+
+        th.PROG-width {
+          min-width: 1em;
+        }
+
+        input.instruction {
+          display: block;
+          margin: 0;
+          padding: 0;
+          max-width: 100px;
+          width: 100%;
+
+          background-color: #000;
+          font-family: "Fira Code";
+          font-size: 12px;
+          color: #00bb41;
+          border: 1px solid #888;
+        }
+
+        /* Remove this if you only have a single page */
+        .page-footer::before { content: 'Page '; }
+        .page-footer::after { content: ' of 2'; }
+
+        .code {
+          width: 100%;
+          display: flex;
+          gap: 20px;
+        }
+
+        .program-box {
+          flex: 1;
+          padding: 20px;
+          /* background-color: #f0f0f0;*/
+        }
+    </style>
+</head>
+<body>
+    <div class="section">
+        <div class="page page-bg-01">
+            <div class="page-header">
+                <span class="page-header-doc-title">Keep Talking and Nobody Explodes Mod</span>
+                <span class="page-header-section-title">Module Name</span>
+            </div>
+            <div class="page-content">
+                <img src="img/Component/6-Bit Assembly.svg" class="diagram">
+                <h2>On the Subject of Simulating 6-Bit Assembly</h2>
+                <p class="flavour-text">Yew Fackin</p>
+
+                <p>First sentence.</p>
+                <ul>
+                    <li>Or as classic bullet points</li>
+                    <li>Step 1</li>
+                    <li>Step 2</li>
+                </ul>
+            </div>
+            <div class="page-footer relative-footer">1</div>
+        </div>
+
+        <div class="page page-bg-02">
+            <div class="page-header">
+                <span class="page-header-doc-title">Keep Talking and Nobody Explodes Mod</span>
+                <span class="page-header-section-title">Module Name</span>
+            </div>
+            <div class="page-content">
+                <h3>Section</h3>
+                <p>More info.</p>
+                <div class="code">
+                  <div>
+                    <table class="program-box" id="PROG0">
+                      <caption>PROG0</caption>
+                      <thead>
+                        <tr>
+                          <th>Ins</th>
+                          <th>ASM</th>
+                          <th>Bits</th>
+                          <th>Ins</th>
+                          <th>ASM</th>
+                          <th>Bits</th>
+                        </tr>
+                      </thead>
+                    </table>
+                  </div>
+                  <div>
+                    <table class="program-box" id="PROG1">
+                      <caption>PROG1</caption>
+                      <thead>
+                        <tr>
+                          <th>Ins</th>
+                          <th>ASM</th>
+                          <th>Bits</th>
+                          <th>Ins</th>
+                          <th>ASM</th>
+                          <th>Bits</th>
+                        </tr>
+                      </thead>
+                    </table>
+                  </div>
+                </div>
+            </div>
+            <div class="page-footer relative-footer">2</div>
+        </div>
+    </div>
+</body>
+</html>
