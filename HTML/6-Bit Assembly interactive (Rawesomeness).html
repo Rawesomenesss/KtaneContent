@@ -9,9 +9,25 @@
     <link rel="stylesheet" type="text/css" href="css/main.css">
     <script src="js/ktane-utils.js" defer></script>
     <script src="js/Modules/6-Bit Assembly Interactive.js" defer></script>
-    <!-- Remove the whole style tag if empty -->
     <style>
-        /* Remove this if you do not have any tables */
+        div.control-menu {
+            z-index: 1;
+            position: fixed;
+            background-color: #29adff80;
+            left: 1em;
+            max-width: 450px;
+        }
+
+        div.processor-state {
+            z-index: 1;
+            position: fixed;
+            background-color: #29adff80;
+            right: 1em;
+            max-width: 450px;
+            padding: 5px;
+            margin: 0 auto;
+        }
+
         table {
           border-collapse: collapse;
           border-spacing: 0;
@@ -20,13 +36,32 @@
         th, td {
           padding: 0;
           border: none;
-          text-align: center;      /* Horizontally center text/content */
+          text-align: center;
           vertical-align: middle;
           font-size: 12px;
         }
 
         th.PROG-width {
           min-width: 1em;
+        }
+
+        table.info-table {
+          border: 1px solid #000;
+          text-align: center;
+          vertical-align: middle;
+          font-size: 15px;
+        }
+
+        th.info-table, td.info-table {
+          padding: 0px 3px; 
+          border: 1px solid #000;
+          text-align: center;
+          vertical-align: middle;
+          font-size: 15px;
+        }
+
+        th.main-memory-info-table {
+          min-width: 15px;
         }
 
         input.instruction {
@@ -43,9 +78,20 @@
           border: 1px solid #888;
         }
 
-        /* Remove this if you only have a single page */
-        .page-footer::before { content: 'Page '; }
-        .page-footer::after { content: ' of 2'; }
+        input.memory-cell {
+          display: block;
+          margin: 0;
+          padding: 0;
+          max-width: 19px;
+          width: 100%;
+
+          text-align: center;
+          background-color: #000;
+          font-family: "Fira Code";
+          font-size: 15px;
+          color: #00bb41;
+          border: 1px solid #888;
+        }
 
         .code {
           width: 100%;
@@ -53,78 +99,165 @@
           gap: 20px;
         }
 
-        .program-box {
+        table.program-box {
           flex: 1;
           padding: 20px;
           /* background-color: #f0f0f0;*/
         }
+
+        td.error {
+          color: #FF0000;
+        }
+
+        h3.control-info-text {
+          text-decoration: none;
+        }
+
+        /* Remove this if you only have a single page */
+        .page-footer::before { content: 'Page '; }
+        .page-footer::after { content: ' of 3'; }
     </style>
 </head>
 <body>
-    <div class="section">
-        <div class="page page-bg-01">
-            <div class="page-header">
-                <span class="page-header-doc-title">Keep Talking and Nobody Explodes Mod</span>
-                <span class="page-header-section-title">Module Name</span>
-            </div>
-            <div class="page-content">
-                <img src="img/Component/6-Bit Assembly.svg" class="diagram">
-                <h2>On the Subject of Simulating 6-Bit Assembly</h2>
-                <p class="flavour-text">Yew Fackin</p>
+  <div class="control-menu">
+    <p>
+    <button class="control-menu-button" id="controls-run-pause-cont" onclick="runButton()">Run</button>
+    <button class="control-menu-button" id="controls-step" onclick="stepButton()">Step</button>
+    <button class="control-menu-button" id="controls-reset" onclick="resetButton()">Halt</button>
+    <input class="control-menu-input" id="controls-speed">
+    <h3 class="control-info-text" id="contols-info-text"><i>Additional info will appear here.</i></h3>
+    </p>
+  </div>
+  <div class="processor-state">
+    <p>
+    <table class="info-table" id="main-memory-info-table">
+      <caption>Main Memory</caption>
+      <thead>
+        <tr>
+          <th class="main-memory-info-table"></th>
+          <th class="main-memory-info-table"></th>
+          <th class="main-memory-info-table"></th>
+          <th class="main-memory-info-table"></th>
+          <th class="main-memory-info-table"></th>
+          <th class="main-memory-info-table"></th>
+          <th class="main-memory-info-table"></th>
+          <th class="main-memory-info-table"></th>
+        </tr>
+      </thead>
+    </table>
+    <table class="info-table" id="register-info-table">
+      <caption>Registers</caption>
+      <thead>
+        <tr>
+          <th class="info-table">Register</th>
+          <th class="info-table">Value</th>
+        </tr>
+      </thead>
+    </table>
+    <table class="info-table" id="flag-info-table">
+      <caption>Flags</caption>
+      <thead>
+        <tr>
+          <th class="info-table">Flag</th>
+          <th class="info-table">Value</th>
+        </tr>
+      </thead>
+    </table>
+    </p>
+  </div>
+  <div class="section">
+    <div class="page page-bg-01">
+      <div class="page-header">
+        <span class="page-header-doc-title">Keep Talking and Nobody Explodes Mod</span>
+        <span class="page-header-section-title">Module Name</span>
+      </div>
+      <div class="page-content">
+        <img src="img/Component/6-Bit Assembly.svg" class="diagram">
+        <h2>On the Subject of Emulating 6-Bit Assembly</h2>
+        <p class="flavour-text">Yew Fackin</p>
 
-                <p>First sentence.</p>
-                <ul>
-                    <li>Or as classic bullet points</li>
-                    <li>Step 1</li>
-                    <li>Step 2</li>
-                </ul>
-            </div>
-            <div class="page-footer relative-footer">1</div>
-        </div>
-
-        <div class="page page-bg-02">
-            <div class="page-header">
-                <span class="page-header-doc-title">Keep Talking and Nobody Explodes Mod</span>
-                <span class="page-header-section-title">Module Name</span>
-            </div>
-            <div class="page-content">
-                <h3>Section</h3>
-                <p>More info.</p>
-                <div class="code">
-                  <div>
-                    <table class="program-box" id="PROG0">
-                      <caption>PROG0</caption>
-                      <thead>
-                        <tr>
-                          <th>Ins</th>
-                          <th>ASM</th>
-                          <th>Bits</th>
-                          <th>Ins</th>
-                          <th>ASM</th>
-                          <th>Bits</th>
-                        </tr>
-                      </thead>
-                    </table>
-                  </div>
-                  <div>
-                    <table class="program-box" id="PROG1">
-                      <caption>PROG1</caption>
-                      <thead>
-                        <tr>
-                          <th>Ins</th>
-                          <th>ASM</th>
-                          <th>Bits</th>
-                          <th>Ins</th>
-                          <th>ASM</th>
-                          <th>Bits</th>
-                        </tr>
-                      </thead>
-                    </table>
-                  </div>
-                </div>
-            </div>
-            <div class="page-footer relative-footer">2</div>
-        </div>
+        <p>First sentence.</p>
+        <ul>
+          <li>Or as classic bullet points</li>
+          <li>Step 1</li>
+          <li>Step 2</li>
+        </ul>
+      </div>
+      <div class="page-footer relative-footer">1</div>
     </div>
+
+    <div class="page page-bg-02">
+      <div class="page-header">
+        <span class="page-header-doc-title">Keep Talking and Nobody Explodes Mod</span>
+        <span class="page-header-section-title">Module Name</span>
+      </div>
+
+      <div class="page-content">
+        <div>
+          <table class="memory-box" id="main-memory-input">
+            <caption>Main Memory</caption>
+            <thead>
+              <tr>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+      </div>
+
+      <div class="page-footer relative-footer">2</div>
+    </div>
+
+    <div class="page page-bg-02">
+      <div class="page-header">
+        <span class="page-header-doc-title">Keep Talking and Nobody Explodes Mod</span>
+        <span class="page-header-section-title">Module Name</span>
+      </div>
+      <div class="page-content">
+        <h3>Section</h3>
+        <p>More info.</p>
+        <div class="code">
+          <div>
+            <table class="program-box" id="PROG0">
+              <caption>PROG0</caption>
+              <thead>
+                <tr>
+                  <th>Ins</th>
+                  <th>ASM</th>
+                  <th>Bits</th>
+                  <th>Ins</th>
+                  <th>ASM</th>
+                  <th>Bits</th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+          <div>
+            <table class="program-box" id="PROG1">
+              <caption>PROG1</caption>
+              <thead>
+                <tr>
+                  <th>Ins</th>
+                  <th>ASM</th>
+                  <th>Bits</th>
+                  <th>Ins</th>
+                  <th>ASM</th>
+                  <th>Bits</th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="page-footer relative-footer">3</div>
+    </div>
+  </div>
 </body>
 </html>

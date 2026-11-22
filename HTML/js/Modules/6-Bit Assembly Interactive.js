@@ -1,77 +1,153 @@
-// NOP	        000 000 000 000 -
-// MOV  Rx, Ry  000 000 xxx yyy	-
-// ADD  Rx, Ry  000 001 xxx yyy	ZcN
-// SUB  Rx, Ry  000 010 xxx yyy ZcN
-// CMP  Rx, Ry  000 011 xxx yyy ZcN
-// AND  Rx, Ry  000 100 xxx yyy	ZN
-// OR   Rx, Ry  000 101 xxx yyy ZN
-// EOR  Rx, Ry  000 110 xxx yyy ZN
-// NOT  Rx	    000 111 000 xxx ZN
-// LD   Rx, P	  000 111 001 xxx -
-// ST   P, Rx	  000 111 010 xxx -
-// LSL  Rx	    000 111 011 xxx ZC
-// LSR  Rx	    000 111 100 xxx ZC
-// ROL  Rx	    000 111 101 xxx ZC
-// ROR  Rx	    000 111 110 xxx ZC
-// RJMP #i	    001 000 iii iii -
-// BREQ #i	    001 001 iii iii -
-// BRNE #i	    001 010 iii iii -
-// BRCS #i	    001 011 iii iii -
-// BRCC #i	    001 100 iii iii -
-// BRMI #i	    001 101 iii iii -
-// BRPL #i	    001 110 iii iii -
-// JOP  addr	  001 111 aaa aaa	-
-// DJZ  Rx, #i  010 xxx iii iii	-
-// LDI  Rx, #i 	100 0xx iii iii	-
-// ADDI Rx, #i	100 1xx iii iii	ZcN
-// SUBI Rx, #i	101 0xx iii iii	ZcN
-// CMPI Rx, #i	101 1xx iii iii	Zcn
-// ANDI Rx, #i	110 0xx iii iii	ZN
-// ORI  Rx, #i 	110 1xx iii iii	ZN
-// EORI Rx, #i	111 0xx iii iii	ZN
+// @ts-check
+ 
+/** ISA condensed:
+ * NOP	        000 000 000 000 -
+ * MOV  Rx, Ry  000 000 xxx yyy	-
+ * ADD  Rx, Ry  000 001 xxx yyy	ZcN
+ * SUB  Rx, Ry  000 010 xxx yyy ZcN
+ * CMP  Rx, Ry  000 011 xxx yyy ZcN
+ * AND  Rx, Ry  000 100 xxx yyy	ZN
+ * OR   Rx, Ry  000 101 xxx yyy ZN
+ * EOR  Rx, Ry  000 110 xxx yyy ZN
+ * NOT  Rx	    000 111 000 xxx ZN
+ * LD   Rx, P	  000 111 001 xxx -
+ * ST   P, Rx	  000 111 010 xxx -
+ * LSL  Rx	    000 111 011 xxx ZC
+ * LSR  Rx	    000 111 100 xxx ZC
+ * ROL  Rx	    000 111 101 xxx ZC
+ * ROR  Rx	    000 111 110 xxx ZC
+ * RJMP #i	    001 000 iii iii -
+ * BREQ #i	    001 001 iii iii -
+ * BRNE #i	    001 010 iii iii -
+ * BRCS #i	    001 011 iii iii -
+ * BRCC #i	    001 100 iii iii -
+ * BRMI #i	    001 101 iii iii -
+ * BRPL #i	    001 110 iii iii -
+ * JOP  addr	  001 111 aaa aaa	-
+ * DJZ  Rx, #i  010 xxx iii iii	-
+ * LDI  Rx, #i 	100 0xx iii iii	-
+ * ADDI Rx, #i	100 1xx iii iii	ZcN
+ * SUBI Rx, #i	101 0xx iii iii	ZcN
+ * CMPI Rx, #i	101 1xx iii iii	Zcn
+ * ANDI Rx, #i	110 0xx iii iii	ZN
+ * ORI  Rx, #i 	110 1xx iii iii	ZN
+ * EORI Rx, #i	111 0xx iii iii	ZN
+ */
 
-const PROG0 = document.getElementById("PROG0");
-const PROG1 = document.getElementById("PROG1");
-var prog0Instructions = Array.of(64);
-var prog1Instructions = Array.of(64);
+/**
+ * @typedef {Object} Instruction
+ * @property {string} opCode - op code of this instruction
+ * @property {number} [Rd] - Destination Register
+ * @property {number} [Rs] - Source Register
+ * @property {number} [imm] - Immediate
+ */
 
-function construct_table(table){
+/**
+ * @callback write
+ * @param {number} value
+ * @param {number} address
+ * @returns {void}
+ */
+
+/** 
+ * @typedef {Object} ProgramMemory
+ * @property {Array.<Instruction>} PROG0 - Page 0 of Program Memory
+ * @property {Array.<Instruction>} PROG1 - Page 1 of Program Memory
+ * @property {number} insCounter - Instruction Counter
+ * @property {boolean} jumped - If the previous instruction jumped, to not increment insCounter
+ * @property {number} page - Which page we are on
+ */
+
+/** 
+ * @typedef {Object} MainMemory
+ * @property {Array.<number>} memory - Program Memory
+ * @property {write} write - function to write to memory
+ */
+
+/** 
+ * @typedef {Object} Flag 
+ * @property {boolean} zero
+ * @property {boolean} carry
+ * @property {boolean} negative
+ */
+
+/** @type {HTMLTableElement} */
+const PROG0InputDOMTable = document.getElementById("PROG0");
+/** @type {HTMLTableElement} */
+const PROG1InputDOMTable = document.getElementById("PROG1");
+/** @type {HTMLTableElement} */
+const mainMemoryInputDOMTable = document.getElementById("main-memory-input");
+
+/** @type {HTMLTableElement} */
+const mainMemoryInfoDOMTable = document.getElementById("main-memory-info-table");
+console.log(mainMemoryInfoDOMTable);
+/** @type {HTMLTableElement} */
+const registerInfoDOMTable = document.getElementById("register-info-table");
+console.log(registerInfoDOMTable);
+/** @type {HTMLTableElement} */
+const flagInfoDOMTable = document.getElementById("flag-info-table");
+
+/** @type {HTMLButtonElement} */
+const controlsButtonRunPauseCont = document.getElementById("controls-run-pause-cont")
+/** @type {HTMLButtonElement} */
+const controlsButtonStep = document.getElementById("controls-step")
+/** @type {HTMLButtonElement} */
+const controlsButtonReset = document.getElementById("controls-reset")
+/** @type {HTMLParagraphElement} */
+const controlsAdditionalInfo = document.getElementById("controls-info-text")
+
+
+var prog0InputDOMElements = Array(64);
+var prog1InputDOMElements = Array(64);
+var mainMemoryInputDOMElements = Array(64);
+
+const DOMInfo = Object.seal({
+  mainMemory: Array(64),
+  register: Array(8),
+  flag: {}
+});
+
+/**
+ * Builds the code input tables and the prog0DOMElements, prog1DOMElements arrays
+ *
+ * @param {HTMLTableElement} table
+ * @returns {void}
+ */
+function constructCodeTable(table){
   for (let i = 0; i < 32; i++){
-    var row = table.insertRow(i+1);
+    var row = table.insertRow(i + 1);
 
-    var instructionLeft = {
-      insAddr: row.insertCell(0),
+    const instructionLeft = {
+      instructionAddress: row.insertCell(0),
       codebox: row.insertCell(1),
       bits: row.insertCell(2),
     };
 
-    var instructionRight = {
-      insAddr: row.insertCell(3),
+    const instructionRight = {
+      instructionAddress: row.insertCell(3),
       codebox: row.insertCell(4),
       bits: row.insertCell(5),
     }
 
-    instructionLeft.insAddr.textContent = i;
-    instructionRight.insAddr.textContent = i + 32;
+    instructionLeft.instructionAddress.textContent = i;
+    instructionRight.instructionAddress.textContent = i + 32;
 
     var inputLeft = document.createElement("input");
-    var inputRight = document.createElement("input");
     inputLeft.classList.add('instruction');
-    inputLeft.setAttribute('maxlength', '10');
+    inputLeft.setAttribute('maxlength', '15');
+
+    var inputRight = document.createElement("input");
     inputRight.classList.add('instruction');
-    inputRight.setAttribute('maxlength', '10');
+    inputRight.setAttribute('maxlength', '15');
+
     // console.log(table.classList);
     if (table.id === "PROG0") {
-      inputLeft.classList.add("PROG0-instruction");
-      inputRight.classList.add("PROG0-instruction");
-      prog0Instructions[i] = instructionLeft;
-      prog0Instructions[i + 32] = instructionRight;
+      prog0InputDOMElements[i] = instructionLeft;
+      prog0InputDOMElements[i + 32] = instructionRight;
     } 
     else if (table.id === "PROG1") {
-      inputLeft.classList.add("PROG1-instruction");
-      inputRight.classList.add("PROG1-instruction");
-      prog1Instructions[i] = instructionLeft;
-      prog1Instructions[i + 32] = instructionRight;
+      prog1InputDOMElements[i] = instructionLeft;
+      prog1InputDOMElements[i + 32] = instructionRight;
     }
 
     instructionLeft.codebox.appendChild(inputLeft);
@@ -79,81 +155,329 @@ function construct_table(table){
   }
 }
 
-construct_table(PROG0);
-construct_table(PROG1);
+/**
+ * Builds the main memory input tables and the mainMemoryDOMElements array
+ *
+ * @param {HTMLTableElement} table
+ * @returns {void}
+ */
+function constructMainMemoryTable(table) {
+  for (let i = 0; i < 8 ; i++) {
+    var row = table.insertRow(i + 1);
+    for (let j = 0; j < 8 ; j++) {
+      var cell = row.insertCell(j)
 
-console.log(prog0Instructions)
-prog0Instructions.forEach((instruction, index) => {
-  const input = instruction.codebox.querySelector("input");
-  // Move backward on Backspace if field is empty
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Backspace' && input.value === '' && index > 0) {
-      prog0Instructions[index - 1].codebox.querySelector("input").focus();
+      var input = document.createElement("input");
+      input.classList.add('memory-cell');
+      input.setAttribute('maxlength', '1');
+      cell.appendChild(input);
+      
+      globalThis.mainMemoryInputDOMElements[(i * 8) + j] = cell;
     }
-  });
+  }
+}
 
-  // Move back on ArrowUp
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowUp' && index > 0) {
-      prog0Instructions[index - 1].codebox.querySelector("input").focus();
+/**
+ * Builds the main memory info table
+ *
+ * @param {HTMLTableElement} table
+ * @returns {void}
+ */
+function constructMainMemoryInfoTable(table) {
+  for (let i = 0; i < 8 ; i++) {
+    var row = table.insertRow(i + 1);
+    for (let j = 0; j < 8 ; j++) {
+      var cell = row.insertCell(j);
+      cell.classList.add("info-table");
+      cell.textContent = '_';
+
+      DOMInfo.mainMemory[(i * 8) + j] = cell;
     }
-  });
+  }
+}
 
-  // Move forward when max length is reached
-  input.addEventListener('input', (e) => {
-    if (input.value.length >= input.maxLength && index < prog0Instructions.length - 1) {
-      prog0Instructions[index + 1].codebox.querySelector("input").focus();
-    }
-  });
+/**
+ * Builds the register info table
+ *
+ * @param {HTMLTableElement} table
+ * @returns {void}
+ */
+function constructRegisterInfoTable(table) {
+  for (let i = 0; i < 8 ; i++) {
+    var row = table.insertRow(i + 1);
+    row.classList.add("info-table")
+    
+    var regName = row.insertCell(0);
+    regName.classList.add("info-table")
+    regName.textContent = `R${i}`;
 
-  // Move forward on ArrowDown
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowDown' && index < prog0Instructions.length - 1) {
-      prog0Instructions[index + 1].codebox.querySelector("input").focus();
-    }
-  });
+    var value = row.insertCell(1);
+    value.classList.add("info-table")
+    value.textContent = '0';
 
-  // Move forward on Enter
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && index < prog0Instructions.length - 1) {
-      prog0Instructions[index + 1].codebox.querySelector("input").focus();
-    }
-  });
+    DOMInfo.register[i] = value;
+  }
+}
 
-  input.addEventListener('input', (e) => {
-    validateInstruction(input.value)
+/**
+ * Builds the flag info table
+ *
+ * @param {HTMLTableElement} table
+ * @returns {void}
+ */
+function constructFlagInfoTable(table) {
+  let flagNames = ["zero", "carry", "negative"]
+  let i = 0
+  for (const flagName in flagNames) {
+    var row = table.insertRow(i + 1);
+    row.classList.add("info-table")
+
+    var name = row.insertCell(0);
+    name.classList.add("info-table")
+    name.textContent = flagName;
+
+    var value = row.insertCell(1);
+    value.classList.add("info-table")
+    value.textContent = "false";
+
+    DOMInfo.flag[flagName] = value;
+    i += 1;
+  }
+}
+
+function attachProgramTableControls(DOMElements) {
+  DOMElements.forEach((instruction, index) => {
+    const input = instruction.codebox.querySelector("input");
+
+    // Move up on Backspace if field is empty
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' && input.value === '' && index > 0) {
+        DOMElements[index - 1].codebox.querySelector("input").focus();
+      }
+    });
+
+    // Move up on ArrowUp
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp' && index > 0) {
+        DOMElements[index - 1].codebox.querySelector("input").focus();
+      }
+    });
+
+    // Move down on ArrowDown
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' && index < DOMElements.length - 1) {
+        DOMElements[index + 1].codebox.querySelector("input").focus();
+      }
+    });
+
+    // Move down on Enter
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && index < DOMElements.length - 1) {
+        DOMElements[index + 1].codebox.querySelector("input").focus();
+      }
+    });
+
+    input.addEventListener('input', (e) => {
+      /** @type {Instruction | String} */
+      let ins = makeInstruction(input.value)
+      if (typeof ins === "string") {
+        // console.log(`yes instance of string`)
+        instruction.bits.classList.add('error');
+        instruction.bits.textContent = ins;
+      } else {
+        // console.log("valid instruction");
+        let insBits = translateInstructionToBits(ins);
+        instruction.bits.classList.remove('error');
+        instruction.bits.textContent = insBits;
+      }
+    });
   });
-});
+}
+
+function attachMainMemoryTableControls(DOMElements){
+  DOMElements.forEach((word, index) => {
+    const input = word.querySelector("input");
+    // Move on Filled cell
+    input.addEventListener('keydown', (e) => {
+      if (!(e.key === 'Backspace') && input.value.length === input.maxLength && index < 63) {
+        DOMElements[index + 1].querySelector("input").focus();
+      }
+    });
+
+    // Move back on Backspace if field is empty
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' && input.value === '' && index > 0) {
+        DOMElements[index - 1].querySelector("input").focus();
+      }
+    });
+
+    // Move forward on Enter
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        DOMElements[(index + 1) % 64].querySelector("input").focus();
+      }
+    });
+
+    // Move up on ArrowUp
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp')  {
+        let rowNo = Math.floor(index / 8);
+        let colNo = index % 8;
+        let focusRowNo = (rowNo - 1 < 0) ? 7 : rowNo - 1;
+        DOMElements[(focusRowNo * 8) + colNo].querySelector("input").focus();
+      }
+    });
+
+    // Move down on ArrowDown
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') {
+        let rowNo = Math.floor(index / 8);
+        let colNo = index % 8;
+        let focusRowNo = (rowNo + 1) % 8;
+        DOMElements[(focusRowNo * 8) + colNo].querySelector("input").focus();
+      }
+    });
+
+    // Move up on ArrowLeft
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') {
+        let rowNo = Math.floor(index / 8); // can also be `index - (index % 8)` since we *8 later
+        let colNo = index % 8;
+        let focusColNo = (colNo - 1 < 0) ? 7 : colNo - 1;
+        DOMElements[(rowNo * 8) + focusColNo].querySelector("input").focus();
+      }
+    });
+
+    // Move down on ArrowRight
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') {
+        let rowNo = Math.floor(index / 8); // can also be `index - (index % 8)` since we *8 later
+        let colNo = index % 8;
+        let focusColNo = (colNo + 1) % 8
+        DOMElements[(rowNo * 8) + focusColNo].querySelector("input").focus();
+      }
+    });
+  });
+}
+
+/**
+ * Updates controls UI based on state
+ * **ASSUMES COLLECT HAS ALREADY RAN**
+ *
+ * @returns {Promise<void>}
+ */
+async function updateControlsDOM() {
+  //TODO do this
+  if (globalThis.processorState.state === globalThis.processorStateEnum.INIT) {
+    controlsButtonRunPauseCont.textContent = "Run";
+    controlsButtonRunPauseCont.disabled = false;
+
+    // controlsButtonStep.textContent = "Step";
+    controlsButtonStep.disabled = false;
+
+    // controlsButtonReset.textContent = "Reset";
+    controlsButtonReset.disabled = true;
+  } else if (globalThis.processorState.state === globalThis.processorStateEnum.RUNNING) {
+    controlsButtonRunPauseCont.textContent = "Pause";
+    controlsButtonRunPauseCont.disabled = false;
+
+    // controlsButtonStep.textContent = "Step";
+    controlsButtonStep.disabled = true;
+
+    // controlsButtonReset.textContent = "Reset";
+    controlsButtonReset.disabled = false;
+  } else if (globalThis.processorState.state === globalThis.processorStateEnum.PAUSE) {
+    controlsButtonRunPauseCont.textContent = "Cont.";
+    controlsButtonRunPauseCont.disabled = false;
+
+    // controlsButtonStep.textContent = "Step";
+    controlsButtonStep.disabled = false;
+
+    // controlsButtonReset.textContent = "Reset";
+    controlsButtonReset.disabled = false;
+  }
+}
+
+/**
+ * Updates controls UI based on state
+ * **ASSUMES COLLECT HAS ALREADY RAN**
+ *
+ * @returns {Promise<void>}
+ */
+async function updateInfoDOM() {
+  DOMInfo.flag[zero].textContent = `${globalThis.flag.zero}`
+  DOMInfo.flag[carry].textContent = `${globalThis.flag.carry}`
+  DOMInfo.flag[negative].textContent = `${globalThis.flag.negative}`
+
+  for (const [index, regValue] of register.entries()){
+    DOMInfo.register[index] = regValue;
+  }
+
+  for (const [index, regValue] of mainMemory.memory.entries()){
+    DOMInfo.mainMemory[index] = regValue;
+  }
+}
+
+async function updateDOM() {
+  updateControlsDOM()
+  updateInfoDOM()
+}
 
 const REGMAX = 64
 const REGZERO = 31
-var register = Array.of(8);
+var pauseExecution = true;
+var register = Array(8);
+
+// **NEVER UPDATE**
+var processorStateEnum = Object.freeze({
+  INIT: Symbol('init'),
+  PAUSE: Symbol('pause'),
+  RUNNING: Symbol('running'),
+});
+
+var processorState = {
+  state: processorStateEnum.PAUSE
+};
+
+/** @type Flag */
 var flag = {
   zero: false,
   carry: false,
   negative: false,
 };
 
+/** @type MainMemory */
 var mainMemory = {
-  memory: Array.of(64),
+  memory: Array(64),
   write: function(value, address) {
-    if (number >= 64) {
-      console.log(`Illegal Write: ${number}`);
-      return;
-    }
-    memory[address] = value;
+    this.memory[address] = value;
   }
 };
 
-var programMemory = {
-  PROG1: Array.of(64),
-  PROG2: Array.of(64),
+/** @type MainMemory */
+var savedMemory = {
+  memory: Array(64),
+  write: function(value, address) {
+    this.memory[address] = value;
+  }
 };
 
-var insCounter = 0;
-var jumped = false;
-var page = 0;
+/** @type {ProgramMemory} */
+var programMemory = {
+  PROG0: Array(64),
+  PROG1: Array(64),
+  insCounter: 0,
+  jumped: false,
+  page: 0,
+};
 
+/**
+ * Takes mod with and handles negatives as well
+ *
+ * @param {number} a - number 'a'
+ * @param {number} b - number 'b'
+ * @returns {number} an instruction or a parse error
+ */
 function mod(a, b) { 
   b == 0 ? 0 : ((a % b) + b) % b;
   if (b === 0) {
@@ -162,17 +486,28 @@ function mod(a, b) {
   return ((a % b) + b) % b;
 }
 
-function validateInstruction(instruction) {
-  const pattern = /^([A-Za-z]{2,4}) +(R[0-7], *R[0-7]|R[0-7]|R[0-7], *[0-6]?[0-9]|[0-6]?[0-9])$/;
+/**
+ * Makes an instruction
+ *
+ * @param {string} rawInstruction - Raw instruction from textbox
+ * @returns {Instruction | String} an instruction or parse error reason
+ */
+function makeInstruction(rawInstruction) {
+  if (rawInstruction === '') {
+    return ""
+  }
+
+  const pattern = /^([A-Za-z]{2,4}) ?(R\d,? *R\d|R\d|[Rr]\d, *[0-6]?\d|[0-6]?\d)?$/i;
   const argTypesRegex = [
     /(^$)/,
-    /R([0-7]), *R([0-7])/, 
-    /R([0-7])/, 
-    /([0-6]?[0-9])/, 
-    /R([0-7]), *([0-6]?[0-9])/,
+    /R(\d), *R(\d)/i,
+    /R(\d)/i,
+    /(\d?\d)/i,
+    /R(\d), *(\d?\d)/i,
   ];
 
-  const opcodes = {
+  /** @type {Object.<string, number>} */
+  const opcodesTable = {
     NOP:  0,
     MOV:  1,
     ADD:  1,
@@ -206,208 +541,480 @@ function validateInstruction(instruction) {
     EORI: 4,
   }
 
-  if (!pattern.test(instruction)) {
-    console.log("Fucked")
-    return false
+  console.log(`making instruction from: ${rawInstruction}`);
+
+  if (!pattern.test(rawInstruction)) {
+    console.log("Malformed Expression")
+    return "Malformed Expression"
   }
 
-  instruction = instruction.match(pattern);
+  const insRegex = rawInstruction.match(pattern).map(x => x?.toString().toUpperCase() ?? "");
+  console.log(`regex made [insRegex]: ${insRegex.join('|')}`);
 
-  if (!Object.keys(opcodes).includes(instruction[1])) {
+  if (!Object.keys(opcodesTable).map(op => op.toUpperCase()).includes(insRegex[1])) {
     console.log("Invalid opcode");
-    return false
+    return "Invalid opcode";
   }
 
+  /** @type {Instruction}*/
   let ins = {
-    opcode: instruction[1],
+    opCode: insRegex[1].toUpperCase(),
   }
 
-  const insArgsRegex = argTypesRegex[opcodes[ins.opcode]]
-  console.log(insArgsRegex)
+  const insArgsRegex = argTypesRegex[opcodesTable[ins.opCode]];
+  console.log(`chosen regex: ${insArgsRegex}`);
 
-  if (!insArgsRegex.test(instruction[2])) {
+  if (!insArgsRegex.test(insRegex[2])) {
     console.log("Invalid args");
-    return false
+    return "Invalid args";
   }
 
-  switch (opcodes[ins.opcode]) {
+  switch (opcodesTable[ins.opCode]) {
     case 0:
       break;
 
-    case 1:
-      ins["Rx"] = instruction[2].match(insArgsRegex)[1]
-      ins["Ry"] = instruction[2].match(insArgsRegex)[2]
-      break;
+    // Rx, Ry
+    case 1: {
+        let [, Rx, Ry] = insRegex[2].match(insArgsRegex).map(x => parseInt(x));
+        if (Rx > 7) {
+          console.log("Rx too large");
+          return "Rx too large";
+        }
 
-    case 2:
-      ins["Rx"] = instruction[2].match(insArgsRegex)[1]
-      break;
+        if (Ry > 7) {
+          console.log("Ry too large");
+          return "Ry too large";
+        }
 
-    case 3:
-      ins["imm6"] = instruction[2].match(insArgsRegex)[1]
-      break;
+        ins.Rd = Rx
+        ins.Rs = Ry
+        break;
+      }
+      
+    // Rx
+    case 2: {
+      let [, Rx] = insRegex[2].match(insArgsRegex).map(x => parseInt(x));
+      if (Rx > 7) {
+        console.log("Rx too large");
+        return "Rx too large";
+      }
 
-    case 4:
-      ins["Rx"] = instruction[2].match(insArgsRegex)[1]
-      ins["imm6"] = instruction[2].match(insArgsRegex)[2]
+      ins.Rd = Rx
       break;
+    }
+
+    // #i
+    case 3: {
+      let [, imm] = insRegex[2].match(insArgsRegex).map(x => parseInt(x));
+      if (imm > 63) {
+        console.log("Immediate too large");
+        return "Immediate too large";
+      }
+
+      ins.imm = imm
+      break;
+    }
+    
+    // Rx, #i
+    case 4: {
+      let [, Rx, imm] = insRegex[2].match(insArgsRegex).map(x => parseInt(x));
+      // if opcode is DJZ, allowed register are R0 - R7 
+      if (ins.opCode === "DJZ") {
+        if (Rx > 7) {
+          console.log("Rx too large");
+          return "Rx too large";
+        }
+        if (imm > 63) {
+          console.log("Immediate too large");
+          return "Immediate too large";
+        } 
+
+        ins.Rd = Rx;
+        ins.imm = imm;
+        break;
+      }
+
+      if (Rx > 7) {
+        console.log("Rx too large");
+        return "Rx too large";
+      }
+      if (Rx < 4) {
+        console.log("Rx too small");
+        return "Rx too small";
+      }
+
+      if (imm > 63) {
+        console.log("Immediate too large");
+        return "Immediate too large";
+      } 
+
+      ins.Rd = Rx;
+      ins.imm = imm;
+      break;
+    }
   }
+  
+  console.log(`Finished Op:`, ins)
+  return ins;
+}
+
+/**
+ * Translates an assembly instruction to bits
+ *
+ * @param {Instruction}  instruction - A string param.
+ * @returns {string} Bit version of the instruction
+ */
+function translateInstructionToBits(instruction) {
+  console.log(`Translating: ${JSON.stringify(instruction)}`)
+  const opcodeBits = {
+    NOP:  "000 000 000 000",
+    MOV:  "000 000",
+    ADD:  "000 001",
+    SUB:  "000 010",
+    CMP:  "000 011",
+    AND:  "000 100",
+    OR:   "000 101",
+    EOR:  "000 110",
+    NOT:  "000 111 000",
+    LD:   "000 111 001",
+    ST:   "000 111 010",
+    LSL:  "000 111 011",
+    LSR:  "000 111 100",
+    ROL:  "000 111 101",
+    ROR:  "000 111 110",
+    RJMP: "001 000",
+    BREQ: "001 001",
+    BRNE: "001 010",
+    BRCS: "001 011",
+    BRCC: "001 100",
+    BRMI: "001 101",
+    BRPL: "001 110",
+    JOP:  "001 111",
+    DJZ:  "010",
+    LDI:  "100 0",
+    ADDI: "100 1",
+    SUBI: "101 0",
+    CMPI: "101 1",
+    ANDI: "110 0",
+    ORI:  "110 1",
+    EORI: "111 0",
+  };
+
+  var op = instruction.opCode;
+  var bits = opcodeBits[op]
+
+  if (op.toUpperCase() === "DJZ"){
+    bits += ` ${instruction.Rd.toString(2).padStart(3, '0')}`
+    imm = instruction.imm.toString(2).padStart(6, '0').replace(/\d{3}(?=.)/g, "$& ");
+    bits += ` ${imm}`
+    return bits
+  }
+
+  if ('Rd' in instruction && 'Rs' in instruction){
+    bits += ` ${instruction.Rd.toString(2).padStart(3, '0')}`
+    bits += ` ${instruction.Rs.toString(2).padStart(3, '0')}`
+  } else if ('Rd' in instruction && 'imm' in instruction){
+    bits += ` ${(instruction.Rd - 4).toString(2).padStart(2, '0')}`
+    imm = instruction.imm.toString(2).padStart(6, '0').replace(/\d{3}(?=.)/g, "$& ");
+    bits += ` ${imm}`
+  } else if ('Rd' in instruction){
+    bits += ` ${instruction.Rd.toString(2).padStart(3, '0')}`
+  } else if ('imm' in instruction){
+    imm = instruction.imm.toString(2).padStart(6, '0').replace(/\d{3}(?=.)/g, "$& ");
+    bits += ` ${imm}`
+  } 
+  
+  console.log(`Bits: ${bits}`);
+  return bits
 }
 
 // All ops will change global state
-const opcode = {
-  NOP() {
+const executeOpTable = {
+  NOP(ins) {
     return;
   },
-  MOV(Rd, Rs) {
-    register[Rd] = register[Rs];
+  MOV(ins) {
+    register[ins.Rd] = register[ins.Rs];
   },
-  ADD(Rd, Rs) {
-    register[Rd] += register[Rs];
-    flag.carry ^= register[Rd] > 63;
-    register[Rd] = mod(register[Rd], 64);
-    flag.negative = register[Rd] > 31;
-    flag.zero = register[Rd] == 0;
+  ADD(ins) {
+    register[ins.Rd] += register[ins.Rs];
+    flag.carry = flag.carry !== (register[ins.Rd] > 63);
+    register[ins.Rd] = mod(register[ins.Rd], 64);
+    flag.negative = register[ins.Rd] > 31;
+    flag.zero = register[ins.Rd] == 0;
   }, 
-  SUB(Rd, Rs) {
-    register[Rd] -= register[Rs];
-    flag.carry ^= register[Rd] < 0;
-    register[Rd] = mod(register[Rd], 64);
-    flag.negative = register[Rd] > 31;
-    flag.zero = register[Rd] == 0;
+  SUB(ins) {
+    register[ins.Rd] -= register[ins.Rs];
+    flag.carry = flag.carry !== (register[ins.Rd] < 0);
+    register[ins.Rd] = mod(register[ins.Rd], 64);
+    flag.negative = register[ins.Rd] > 31;
+    flag.zero = register[ins.Rd] == 0;
   },
-  CMP(Rd, Rs) {
-    flag.carry ^= register[Rd] < register[Rs];
-    flag.negative = mod(register[Rd] - register[Rs], 64) > 31;
-    flag.zero = register[Rd] === register[Rs];
+  CMP(ins) {
+    flag.carry = flag.carry !== (register[ins.Rd] < register[ins.Rs]);
+    flag.negative = mod(register[ins.Rd] - register[ins.Rs], 64) > 31;
+    flag.zero = register[ins.Rd] === register[ins.Rs];
   },
-  AND(Rd, Rs) {
-    register[Rd] &= register[Rs];
-    flag.negative = register[Rd] > 31;
-    flag.zero = register[Rd] == 0;
+  AND(ins) {
+    register[ins.Rd] &= register[ins.Rs];
+    flag.negative = register[ins.Rd] > 31;
+    flag.zero = register[ins.Rd] == 0;
   },
-  OR(Rd, Rs) {
-    register[Rd] |= register[Rs];
-    flag.negative = register[Rd] > 31;
-    flag.zero = register[Rd] == 0;
+  OR(ins) {
+    register[ins.Rd] |= register[ins.Rs];
+    flag.negative = register[ins.Rd] > 31;
+    flag.zero = register[ins.Rd] == 0;
   },
-  EOR(Rd, Rs) {
-    register[Rd] ^= register[Rs];
-    flag.negative = register[Rd] > 31;
-    flag.zero = register[Rd] == 0;
+  EOR(ins) {
+    register[ins.Rd] ^= register[ins.Rs];
+    flag.negative = register[ins.Rd] > 31;
+    flag.zero = register[ins.Rd] == 0;
   },
-  NOT(Rd) {
-    register[Rd] = 63 - register;
-    flag.negative = register[Rd] > 31;
-    flag.zero = register[Rd] == 0;
+  NOT(ins) {
+    register[ins.Rd] = 63 - register;
+    flag.negative = register[ins.Rd] > 31;
+    flag.zero = register[ins.Rd] == 0;
   },
-  LD(Rd, P) {
-    register[Rd] = mainMemory.memory[register[7]];
+  LD(ins) {
+    register[ins.Rd] = mainMemory.memory[register[7]];
   },
-  ST(P, Rd) {
-    mainMemory.write(Rd, register[7]);
+  ST(ins) {
+    mainMemory.write(ins.Rd, register[7]);
   },
-  LSL(Rd) {
-    flag.carry = register[Rd] > 31;
-    register[Rd] = mod(register[Rd] << 1, 64);
-    flag.zero = register[Rd] === 0;
+  LSL(ins) {
+    flag.carry = register[ins.Rd] > 31;
+    register[ins.Rd] = mod(register[ins.Rd] << 1, 64);
+    flag.zero = register[ins.Rd] === 0;
   },
-  LSR(Rd) {
-    flag.carry = (register[Rd] & 1) == 1;
-    register[Rd] >>= register[Rd];
-    flag.zero = register[Rd] === 0;
+  LSR(ins) {
+    flag.carry = (register[ins.Rd] & 1) == 1;
+    register[ins.Rd] >>= register[ins.Rd];
+    flag.zero = register[ins.Rd] === 0;
   },
-  ROL(Rd) {
-    registers[Rd] = (registers[Rd] << 1) + (flag.carry ? 1 : 0);
-    flag.carry = registers[Rd] > 63;
-    registers[Rd] = mod(registers[Rd], 64);
-    flag.zero = registers[Rd] == 0;
+  ROL(ins) {
+    register[ins.Rd] = (register[ins.Rd] << 1) + (flag.carry ? 1 : 0);
+    flag.carry = register[ins.Rd] > 63;
+    register[ins.Rd] = mod(register[ins.Rd], 64);
+    flag.zero = register[ins.Rd] == 0;
   },
-  ROR(Rd) {
-    registers[Rd] += flag.carry ? 64 : 0;
-    flag.carry = (registers[Rd] & 1) == 1;
-    registers[Rd] >>= 1;
-    flag.zero = registers[Rd] == 0;
+  ROR(ins) {
+    register[ins.Rd] += flag.carry ? 64 : 0;
+    flag.carry = (register[ins.Rd] & 1) == 1;
+    register[ins.Rd] >>= 1;
+    flag.zero = register[ins.Rd] == 0;
   },
-  RJMP(insAddr) {
-    insCounter = ((addr + insCounter) & 63) + (insCounter & 64);
-    jumped = true;
+  RJMP(ins) {
+    programMemory.insCounter = ((ins.imm + programMemory.insCounter) & 63) + (programMemory.insCounter & 64);
+    programMemory.jumped = true;
   },
-  BREQ(insAddr) {
+  BREQ(ins) {
     if (flag.zero) {
-      RJMP(addr);
+      RJMP(ins);
     }
   },
-  BRNE(insAddr) {
+  BRNE(ins) {
     if (!flag.zero) {
-      RJMP(addr);
+      RJMP(ins);
     }
   },
-  BRCS(insAddr) {
+  BRCS(ins) {
     if (flag.carry) {
-      RJMP(addr);
+      RJMP(ins);
     }
   },
-  BRCC(insAddr) {
+  BRCC(ins) {
     if (!flag.carry) {
-      RJMP(addr);
+      RJMP(ins);
     }
   },
-  BRMI(insAddr) {
+  BRMI(ins) {
     if (flag.negative) {
-      RJMP(addr);
+      RJMP(ins);
     }
   },
-  BRPL(insAddr) {
+  BRPL(ins) {
     if (!flag.negative) {
-      RJMP(addr);
+      RJMP(ins);
     }
   },
-  JOP(addr) {
-    insCounter = (((insCounter & 64) == 64) ? 0 : 64) + addr;
-    jumped = true;
+  JOP(ins) {
+    programMemory.insCounter = (((programMemory.insCounter & 64) == 64) ? 0 : 64) + ins.imm;
+    programMemory.jumped = true;
+    programMemory.page ^= 1;
   },
-  DJZ(Rd, insAddr) {
-    registers[Rd] = mod(registers[Rd] - 1, 64);
-    if (registers[Rd] == 0) RJMP(addr);
+  DJZ(ins) {
+    register[ins.Rd] = mod(register[ins.Rd] - 1, 64);
+    if (register[ins.Rd] == 0) RJMP(ins);
   },
 
   // Rx is R4-R7
-  LDI(Rx, imm6) { 
-    register[Rx] = imm6;
+  LDI(ins) {
+    register[ins.Rd] = ins.imm;
   },
-  ADDI(Rx, imm6) {
-    register[Rx] += imm6;
-    flag.carry ^= register[Rx] > 63;
-    registers[Rx] = mod(registers[Rx], 64);
-    flag.negative = register[Rx] > 31;
-    flag.carry = register[Rx] == 0;
+  ADDI(ins) {
+    register[ins.Rd] += ins.imm;
+    flag.carry = flag.carry !== (register[ins.Rd] > 63);
+    register[ins.Rd] = mod(register[ins.Rd], 64);
+    flag.negative = register[ins.Rd] > 31;
+    flag.carry = register[ins.Rd] == 0;
   },
-  SUBI(Rx, imm6) {
-    register[Rx] -= imm6;
-    flag.carry ^= register[Rx] > 63;
-    registers[Rx] = mod(registers[Rx], 64);
-    flag.negative = register[Rx] > 31;
-    flag.carry = register[Rx] == 0;
+  SUBI(ins) {
+    register[ins.Rd] -= ins.imm;
+    flag.carry = flag.carry !== (register[ins.Rd] > 63);
+    register[ins.Rd] = mod(register[ins.Rd], 64);
+    flag.negative = register[ins.Rd] > 31;
+    flag.carry = register[ins.Rd] == 0;
   },
-  CMPI(Rx, imm6) {
-    flag.carry ^= register[Rx] < imm6;
-    flag.negative = mod(register[Rx] - imm6, 64) >31;
-    flag.zero = register[Rx] == 0;
+  CMPI(ins) {
+    flag.carry = flag.carry !== (register[ins.Rd] < ins.imm);
+    flag.negative = mod(register[ins.Rd] - ins.imm, 64) >31;
+    flag.zero = register[ins.Rd] == 0;
   },
-  ANDI(Rx, imm6) {
-    registers[Rx] &= imm6;
-    flag.negative = registers[Rx] > 31;
-    flag.zero = registers[Rx] == 0;
+  ANDI(ins) {
+    register[ins.Rd] &= ins.imm;
+    flag.negative = register[ins.Rd] > 31;
+    flag.zero = register[ins.Rd] == 0;
   },
-  ORI(Rx, imm6) {
-    registers[Rx] |= imm6;
-    flag.negative = registers[Rx] > 31;
-    flag.zero = registers[Rx] == 0;
+  ORI(ins) {
+    register[ins.Rd] |= ins.imm;
+    flag.negative = register[ins.Rd] > 31;
+    flag.zero = register[ins.Rd] == 0;
   },
-  EORI(Rx, imm6) {
-    registers[Rx] ^= imm6;
-    flag.negative = registers[Rx] > 31;
-    flag.zero = registers[Rx] == 0;
+  EORI(ins) {
+    register[ins.Rd] ^= ins.imm;
+    flag.negative = register[ins.Rd] > 31;
+    flag.zero = register[ins.Rd] == 0;
   },
 };
+
+/**
+ *
+ */
+function collectCode(){
+  prog0InputDOMElements.forEach((instruction, index) => {
+    const input = instruction.codebox.querySelector("input");
+    let rawIns = input.value
+    globalThis.programMemory.PROG0[index] = makeInstruction(rawIns);
+  });
+
+  prog1InputDOMElements.forEach((instruction, index) => {
+    const input = instruction.codebox.querySelector("input");
+    let rawIns = input.value
+    globalThis.programMemory.PROG1[index] = makeInstruction(rawIns)
+  });
+}
+
+function collectMainMemory() {
+  mainMemoryInputDOMElements.forEach((memCell, index) => {
+    const input = memCell.querySelector("input");
+    let memValue = input.value;
+    globalThis.mainMemory.write(memValue, index);
+  });
+}
+
+function resetButton() { // FIXME repeated unnecessary if blocks
+  if (globalThis.processorState.state === globalThis.processorStateEnum.INIT) {
+    globalThis.processorState.state = globalThis.processorStateEnum.INIT;
+  } else if (globalThis.processorState.state === globalThis.processorStateEnum.RUNNING){
+    globalThis.processorState.state = globalThis.processorStateEnum.INIT;
+  } else if (globalThis.processorState.state === globalThis.processorStateEnum.PAUSE) {
+    globalThis.processorState.state = globalThis.processorStateEnum.INIT;
+  }
+
+  resetProgram();
+}
+
+function runButton() { // FIXME repeated unnecessary if blocks 
+  if (globalThis.processorState.state === globalThis.processorStateEnum.INIT){
+    globalThis.processorState.state = globalThis.processorStateEnum.RUNNING;
+  } else if (globalThis.processorState.state === globalThis.processorStateEnum.RUNNING) {
+    globalThis.processorState.state = globalThis.processorStateEnum.PAUSE;
+    clearTimeout(globalThis.sleep)
+  } else if (globalThis.processorState.state === globalThis.processorStateEnum.PAUSE) {
+    globalThis.processorState.state = globalThis.processorStateEnum.RUNNING;
+  }
+
+  runProgram();
+}
+
+function stepButton() { // FIXME repeated unnecessary if blocks
+  if (globalThis.processorState.state === globalThis.processorStateEnum.INIT){
+    globalThis.processorState.state = globalThis.processorStateEnum.PAUSE;
+  } else if (globalThis.processorState.state === globalThis.processorStateEnum.RUNNING){
+    globalThis.processorState.state = globalThis.processorStateEnum.PAUSE;
+  } else if (globalThis.processorState.state === globalThis.processorStateEnum.PAUSE) {
+    globalThis.processorState.state = globalThis.processorStateEnum.PAUSE;
+  }
+
+  stepProgram()
+}
+
+function executeOp(instruction) {
+  if (instruction === "") {
+    return;
+  }
+  console.log(instruction)
+  executeOpTable[instruction.opCode](instruction)
+}
+
+function resetProgram() {
+  globalThis.register = Array(8);
+  globalThis.flag = {
+    zero: false,
+    carry: false,
+    negative: false,
+  };
+  globalThis.programMemory.insCounter = 0;
+  globalThis.programMemory.jumped = false;
+  globalThis.programMemory.page = 0;
+
+  collectMainMemory();
+  collectCode();
+
+  updateDOM();
+}
+
+function stepProgram(){
+  if (!programMemory.jumped) {
+    programMemory.insCounter += 1;
+  }
+
+  if (programMemory.page === 0) {
+    executeOp(programMemory.PROG0[programMemory.insCounter])
+  } else {
+    executeOp(programMemory.PROG1[programMemory.insCounter])
+  }
+
+  updateDOM();
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function runProgram() {
+  while (programMemory.insCounter < 64 && globalThis.processorState.state === globalThis.processorStateEnum.RUNNING) {
+    stepProgram();
+    await sleep(250);
+  }
+  updateDOM();
+}
+
+function main() {
+  constructMainMemoryTable(mainMemoryInputDOMTable);
+  constructCodeTable(PROG0InputDOMTable);
+  constructCodeTable(PROG1InputDOMTable);
+
+  constructMainMemoryInfoTable(mainMemoryInfoDOMTable);
+  constructRegisterInfoTable(registerInfoDOMTable);
+  constructFlagInfoTable(flagInfoDOMTable);
+
+  attachMainMemoryTableControls(mainMemoryInputDOMElements);
+  attachProgramTableControls(prog0InputDOMElements);
+  attachProgramTableControls(prog1InputDOMElements);
+}
+
+//TODO stepProgram doesnt collectCode() and hence breaks
+//TODO formation of Rd, #i bits is fucked
+//TODO (optional) make "computer" object that stores all related data, ie programMemory, flags, MainMemory
+//TODO (optional) make buttons to save the current processor state
+
+main()
