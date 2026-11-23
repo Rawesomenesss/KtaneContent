@@ -80,10 +80,8 @@ const mainMemoryInputDOMTable = document.getElementById("main-memory-input");
 
 /** @type {HTMLTableElement} */
 const mainMemoryInfoDOMTable = document.getElementById("main-memory-info-table");
-console.log(mainMemoryInfoDOMTable);
 /** @type {HTMLTableElement} */
 const registerInfoDOMTable = document.getElementById("register-info-table");
-console.log(registerInfoDOMTable);
 /** @type {HTMLTableElement} */
 const flagInfoDOMTable = document.getElementById("flag-info-table");
 
@@ -101,11 +99,138 @@ var prog0InputDOMElements = Array(64);
 var prog1InputDOMElements = Array(64);
 var mainMemoryInputDOMElements = Array(64);
 
-const DOMInfo = Object.seal({
+/* This will only ever store DOM Elements*/
+var infoDOMElements = Object.seal({
   mainMemory: Array(64),
   register: Array(8),
-  flag: {}
+  flag: {
+    zero: null,
+    carry: null,
+    negative: null,
+  },
 });
+
+var register = Array(8).fill(0);
+
+// **NEVER UPDATE**
+var processorStateEnum = Object.freeze({
+  INIT: Symbol('init'),
+  PAUSE: Symbol('pause'),
+  RUNNING: Symbol('running'),
+});
+
+var processorState = {
+  state: processorStateEnum.PAUSE
+};
+
+/** @type Flag */
+var flag = {
+  zero: false,
+  carry: false,
+  negative: false,
+};
+
+/** @type MainMemory */
+var mainMemory = {
+  memory: Array(64).fill(0),
+  write: function(value, address) {
+    this.memory[address] = value;
+  }
+};
+
+// /** @type MainMemory */
+// var savedMemory = {
+//   memory: Array(64),
+//   write: function(value, address) {
+//     this.memory[address] = value;
+//   }
+// };
+
+/** @type {ProgramMemory} */
+var programMemory = {
+  PROG0: Array(64),
+  PROG1: Array(64),
+  insCounter: 0,
+  jumped: false,
+  page: 0,
+};
+
+function mmSymbolToInt(symbol){
+  let symbols = {
+  "_": 0,
+	"a": 1,
+	"b": 2,
+	"c": 3,
+	"d": 4,
+	"e": 5,
+	"f": 6,
+	"g": 7,
+	"0": 8,
+	"1": 9,
+	"2": 10,
+	"3": 11,
+	"4": 12,
+	"5": 13,
+	"6": 14,
+	"7": 15,
+	"8": 16,
+	"9": 17,
+	".": 18,
+	",": 19,
+	"!": 10,
+	"@": 21,
+	"#": 22,
+	"$": 23,
+	"A": 24,
+	"B": 25,
+	"C": 26,
+	"D": 27,
+	"E": 28,
+	"F": 29,
+	"G": 20,
+	"H": 31,
+	"I": 32,
+	"J": 33,
+	"K": 34,
+	"L": 35,
+	"M": 36,
+	"N": 37,
+	"O": 38,
+	"P": 39,
+	"Q": 30,
+	"R": 41,
+	"S": 42,
+	"T": 43,
+	"U": 44,
+	"V": 45,
+	"W": 46,
+	"X": 47,
+	"Y": 48,
+	"Z": 49,
+	"^": 40,
+	"&": 41,
+	"*": 52,
+	"-": 53,
+	"+": 54,
+	"=": 55,
+	"~": 56,
+	"?": 57,
+	"<": 58,
+	">": 59,
+	"[": 60,
+	"]": 61,
+	"(": 62,
+	")": 63,
+  };
+
+  return symbols[symbol];
+}
+
+function mmIntToSymbol(index) {
+  let symbols = "_abcdefg0123456789.,!@#$ABCDEFGHIJKLMNOPQRSTUVWXYZ^&*-+=~?<>[]()";
+
+  return symbols[index];
+}
 
 /**
  * Builds the code input tables and the prog0DOMElements, prog1DOMElements arrays
@@ -191,7 +316,7 @@ function constructMainMemoryInfoTable(table) {
       cell.classList.add("info-table");
       cell.textContent = '_';
 
-      DOMInfo.mainMemory[(i * 8) + j] = cell;
+      infoDOMElements.mainMemory[(i * 8) + j] = cell;
     }
   }
 }
@@ -207,15 +332,15 @@ function constructRegisterInfoTable(table) {
     var row = table.insertRow(i + 1);
     row.classList.add("info-table")
     
-    var regName = row.insertCell(0);
-    regName.classList.add("info-table")
-    regName.textContent = `R${i}`;
+    var regNameCell = row.insertCell(0);
+    regNameCell.classList.add("info-table")
+    regNameCell.textContent = `R${i}`;
 
-    var value = row.insertCell(1);
-    value.classList.add("info-table")
-    value.textContent = '0';
+    var valueCell = row.insertCell(1);
+    valueCell.classList.add("info-table")
+    valueCell.textContent = '0';
 
-    DOMInfo.register[i] = value;
+    infoDOMElements.register[i] = valueCell;
   }
 }
 
@@ -228,19 +353,19 @@ function constructRegisterInfoTable(table) {
 function constructFlagInfoTable(table) {
   let flagNames = ["zero", "carry", "negative"]
   let i = 0
-  for (const flagName in flagNames) {
+  for (const index in flagNames) {
     var row = table.insertRow(i + 1);
     row.classList.add("info-table")
 
-    var name = row.insertCell(0);
-    name.classList.add("info-table")
-    name.textContent = flagName;
+    var nameCell = row.insertCell(0);
+    nameCell.classList.add("info-table")
+    nameCell.textContent = flagNames[index];
 
-    var value = row.insertCell(1);
-    value.classList.add("info-table")
-    value.textContent = "false";
+    var valueCell = row.insertCell(1);
+    valueCell.classList.add("info-table")
+    valueCell.textContent = "false";
 
-    DOMInfo.flag[flagName] = value;
+    globalThis.infoDOMElements.flag[flagNames[index]] = valueCell;
     i += 1;
   }
 }
@@ -367,7 +492,6 @@ function attachMainMemoryTableControls(DOMElements){
  * @returns {Promise<void>}
  */
 async function updateControlsDOM() {
-  //TODO do this
   if (globalThis.processorState.state === globalThis.processorStateEnum.INIT) {
     controlsButtonRunPauseCont.textContent = "Run";
     controlsButtonRunPauseCont.disabled = false;
@@ -405,16 +529,17 @@ async function updateControlsDOM() {
  * @returns {Promise<void>}
  */
 async function updateInfoDOM() {
-  DOMInfo.flag[zero].textContent = `${globalThis.flag.zero}`
-  DOMInfo.flag[carry].textContent = `${globalThis.flag.carry}`
-  DOMInfo.flag[negative].textContent = `${globalThis.flag.negative}`
+  console.log(globalThis.flag, globalThis.register, globalThis.mainMemory.memory);
+  infoDOMElements.flag.zero.textContent = String(globalThis.flag.zero);
+  infoDOMElements.flag.carry.textContent = String(globalThis.flag.carry);
+  infoDOMElements.flag.negative.textContent = String(globalThis.flag.negative);
 
   for (const [index, regValue] of register.entries()){
-    DOMInfo.register[index] = regValue;
+    infoDOMElements.register[index].textContent = regValue;
   }
 
-  for (const [index, regValue] of mainMemory.memory.entries()){
-    DOMInfo.mainMemory[index] = regValue;
+  for (const [index, value] of mainMemory.memory.entries()){
+    infoDOMElements.mainMemory[index].textContent = mmIntToSymbol(value);
   }
 }
 
@@ -422,54 +547,6 @@ async function updateDOM() {
   updateControlsDOM()
   updateInfoDOM()
 }
-
-const REGMAX = 64
-const REGZERO = 31
-var pauseExecution = true;
-var register = Array(8);
-
-// **NEVER UPDATE**
-var processorStateEnum = Object.freeze({
-  INIT: Symbol('init'),
-  PAUSE: Symbol('pause'),
-  RUNNING: Symbol('running'),
-});
-
-var processorState = {
-  state: processorStateEnum.PAUSE
-};
-
-/** @type Flag */
-var flag = {
-  zero: false,
-  carry: false,
-  negative: false,
-};
-
-/** @type MainMemory */
-var mainMemory = {
-  memory: Array(64),
-  write: function(value, address) {
-    this.memory[address] = value;
-  }
-};
-
-/** @type MainMemory */
-var savedMemory = {
-  memory: Array(64),
-  write: function(value, address) {
-    this.memory[address] = value;
-  }
-};
-
-/** @type {ProgramMemory} */
-var programMemory = {
-  PROG0: Array(64),
-  PROG1: Array(64),
-  insCounter: 0,
-  jumped: false,
-  page: 0,
-};
 
 /**
  * Takes mod with and handles negatives as well
@@ -490,11 +567,11 @@ function mod(a, b) {
  * Makes an instruction
  *
  * @param {string} rawInstruction - Raw instruction from textbox
- * @returns {Instruction | String} an instruction or parse error reason
+ * @returns {Instruction | String | undefined} an instruction or parse error reason
  */
 function makeInstruction(rawInstruction) {
   if (rawInstruction === '') {
-    return ""
+    return undefined
   }
 
   const pattern = /^([A-Za-z]{2,4}) ?(R\d,? *R\d|R\d|[Rr]\d, *[0-6]?\d|[0-6]?\d)?$/i;
@@ -544,15 +621,15 @@ function makeInstruction(rawInstruction) {
   console.log(`making instruction from: ${rawInstruction}`);
 
   if (!pattern.test(rawInstruction)) {
-    console.log("Malformed Expression")
+    // console.log("Malformed Expression")
     return "Malformed Expression"
   }
 
   const insRegex = rawInstruction.match(pattern).map(x => x?.toString().toUpperCase() ?? "");
-  console.log(`regex made [insRegex]: ${insRegex.join('|')}`);
+  // console.log(`regex made [insRegex]: ${insRegex.join('|')}`);
 
   if (!Object.keys(opcodesTable).map(op => op.toUpperCase()).includes(insRegex[1])) {
-    console.log("Invalid opcode");
+    // console.log("Invalid opcode");
     return "Invalid opcode";
   }
 
@@ -562,10 +639,10 @@ function makeInstruction(rawInstruction) {
   }
 
   const insArgsRegex = argTypesRegex[opcodesTable[ins.opCode]];
-  console.log(`chosen regex: ${insArgsRegex}`);
+  // console.log(`chosen regex: ${insArgsRegex}`);
 
   if (!insArgsRegex.test(insRegex[2])) {
-    console.log("Invalid args");
+    // console.log("Invalid args");
     return "Invalid args";
   }
 
@@ -654,7 +731,7 @@ function makeInstruction(rawInstruction) {
     }
   }
   
-  console.log(`Finished Op:`, ins)
+  // console.log(`Finished Op:`, ins)
   return ins;
 }
 
@@ -907,7 +984,7 @@ function collectCode(){
 function collectMainMemory() {
   mainMemoryInputDOMElements.forEach((memCell, index) => {
     const input = memCell.querySelector("input");
-    let memValue = input.value;
+    let memValue = mmSymbolToInt(input.value);
     globalThis.mainMemory.write(memValue, index);
   });
 }
@@ -927,9 +1004,11 @@ function resetButton() { // FIXME repeated unnecessary if blocks
 function runButton() { // FIXME repeated unnecessary if blocks 
   if (globalThis.processorState.state === globalThis.processorStateEnum.INIT){
     globalThis.processorState.state = globalThis.processorStateEnum.RUNNING;
+    collectMainMemory();
+    collectCode();
   } else if (globalThis.processorState.state === globalThis.processorStateEnum.RUNNING) {
     globalThis.processorState.state = globalThis.processorStateEnum.PAUSE;
-    clearTimeout(globalThis.sleep)
+    clearTimeout(globalThis.sleep);
   } else if (globalThis.processorState.state === globalThis.processorStateEnum.PAUSE) {
     globalThis.processorState.state = globalThis.processorStateEnum.RUNNING;
   }
@@ -950,15 +1029,15 @@ function stepButton() { // FIXME repeated unnecessary if blocks
 }
 
 function executeOp(instruction) {
-  if (instruction === "") {
+  if (instruction === undefined) {
     return;
   }
-  console.log(instruction)
+  console.log("[executeOp]:", instruction)
   executeOpTable[instruction.opCode](instruction)
 }
 
 function resetProgram() {
-  globalThis.register = Array(8);
+  globalThis.register = Array(8).fill(0);
   globalThis.flag = {
     zero: false,
     carry: false,
@@ -968,21 +1047,21 @@ function resetProgram() {
   globalThis.programMemory.jumped = false;
   globalThis.programMemory.page = 0;
 
-  collectMainMemory();
-  collectCode();
-
   updateDOM();
 }
 
-function stepProgram(){
-  if (!programMemory.jumped) {
-    programMemory.insCounter += 1;
-  }
+function stepProgram() {
+  console.log("[stepProgram] program counter:", programMemory.insCounter);
+  console.log("[stepProgram] instruction:", programMemory.PROG0[programMemory.insCounter]);
 
   if (programMemory.page === 0) {
     executeOp(programMemory.PROG0[programMemory.insCounter])
   } else {
     executeOp(programMemory.PROG1[programMemory.insCounter])
+  }
+
+  if (!programMemory.jumped) {
+    programMemory.insCounter += 1;
   }
 
   updateDOM();
@@ -1012,9 +1091,13 @@ function main() {
   attachProgramTableControls(prog1InputDOMElements);
 }
 
-//TODO stepProgram doesnt collectCode() and hence breaks
-//TODO formation of Rd, #i bits is fucked
-//TODO (optional) make "computer" object that stores all related data, ie programMemory, flags, MainMemory
-//TODO (optional) make buttons to save the current processor state
-
 main()
+
+//TODO fix: formation of Rd, #i bits is fucked
+//TODO fix: make translated bits on 2 lines like in original manual
+//TODO fix: disable editable when the code is running/paused, ie force a reset from user to edit code
+//TODO feat: infoDOM updates highlight what was updated
+//TODO feat: breakpoints
+//TODO feat: arrow to show current instruction
+//TODO (optional) fix: make "computer" object that stores all related data, ie programMemory, flags, MainMemory
+//TODO (optional) feat: make buttons to save the current processor state into browser cache

@@ -24,8 +24,9 @@
             background-color: #29adff80;
             right: 1em;
             max-width: 450px;
-            padding: 5px;
-            margin: 0 auto;
+            display: flex;
+            flex-direction: column; /* Stacks items vertically */
+            align-items: center;  
         }
 
         table {
@@ -123,7 +124,7 @@
     <p>
     <button class="control-menu-button" id="controls-run-pause-cont" onclick="runButton()">Run</button>
     <button class="control-menu-button" id="controls-step" onclick="stepButton()">Step</button>
-    <button class="control-menu-button" id="controls-reset" onclick="resetButton()">Halt</button>
+    <button class="control-menu-button" id="controls-reset" onclick="resetButton()" disabled>Reset</button>
     <input class="control-menu-input" id="controls-speed">
     <h3 class="control-info-text" id="contols-info-text"><i>Additional info will appear here.</i></h3>
     </p>
